@@ -27,19 +27,18 @@ class MyWebChromeClient(  // reference to activity instance. May be unnecessary 
         fileChooserParams: FileChooserParams
     ): Boolean {
         // make sure there is no existing message
-        if (myActivity.uploadMessage != null) {
-            myActivity.uploadMessage!!.onReceiveValue(null)
-            myActivity.uploadMessage = null
-        }
-    //    myActivity.uploadMessage = filePathCallback
-        val intent = fileChooserParams.createIntent()
-        try {
-            myActivity.startActivityForResult(intent, 100)
-        } catch (e: ActivityNotFoundException) {
-            myActivity.uploadMessage = null
-            Toast.makeText(myActivity, "Cannot open file chooser", Toast.LENGTH_LONG).show()
-            return false
-        }
+//        if (myActivity.uploadMessage != null) {
+//            myActivity.uploadMessage!!.onReceiveValue(null)
+//            myActivity.uploadMessage = null
+//        }
+//        val intent = fileChooserParams.createIntent()
+//        try {
+//            myActivity.startActivityForResult(intent, 100)
+//        } catch (e: ActivityNotFoundException) {
+//            myActivity.uploadMessage = null
+//            Toast.makeText(myActivity, "Cannot open file chooser", Toast.LENGTH_LONG).show()
+//            return false
+//        }
         return true
     }
 }

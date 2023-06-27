@@ -10,12 +10,6 @@ class SplashDialogFragment : DialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setStyle(STYLE_NORMAL, R.style.AppTheme)
-        /* setContentView(R.layout.activity_splash)
-
-         Handler().postDelayed({
-             startActivity(Intent(this,WebActivity::class.java))
-             finish()
-         },2000)*/
     }
 
     override fun onCreateView(
