@@ -1,8 +1,12 @@
 package app.exampay
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -11,6 +15,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.GeolocationPermissions
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -22,6 +27,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.auth.api.signin.GoogleSignInResult
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.common.api.Status
+import java.net.URISyntaxException
 
 
 class WebActivity : AppCompatActivity() {
@@ -32,6 +38,20 @@ class WebActivity : AppCompatActivity() {
     private var isLoadingStarted = false
     private var isTimerFinished = false
     val RC_SIGN_IN = 10121
+
+    val BHIM_UPI = "in.org.npci.upiapp"
+    val GOOGLE_PAY = "com.google.android.apps.nbu.paisa.user"
+    val PHONE_PE = "com.phonepe.app"
+    val PAYTM = "net.one97.paytm"
+    val upiApps = listOf<String>(PAYTM, GOOGLE_PAY, PHONE_PE, BHIM_UPI)
+
+    // we will use these when user responds
+    @JvmField
+    var mGeolocationOrigin: String? = null
+
+    @JvmField
+    var mGeolocationCallback: GeolocationPermissions.Callback? = null
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,94 +68,146 @@ class WebActivity : AppCompatActivity() {
         webView = findViewById(R.id.webview)
         progress = findViewById(R.id.progress)
         progress!!.setVisibility(View.VISIBLE)
+        setDelay()
+        val userAgent = "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Mobile Safari/537.36"
+        webView!!.settings.userAgentString = userAgent
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
+        }
 
-        //
-/*
-        val gso: GoogleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .build()
 
-        val googleApiClient: GoogleApiClient =GoogleApiClient.Builder(this)
-            .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
-            .build()
-*/
+        webView!!.settings.allowContentAccess = true
+        webView!!.settings.allowFileAccess = true
+        webView!!.settings.javaScriptEnabled = true
+        webView!!.settings.domStorageEnabled = true
+        webView!!.settings.databaseEnabled = true
+//        webView!!.getSettings().setCacheMode(WebSettings.LOAD_CACHE_ELSE_NETWORK)
+        webView!!.settings.javaScriptCanOpenWindowsAutomatically = true
+        webView!!.settings.allowFileAccess = true
+        webView!!.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
+        webView!!.webChromeClient = GeoWebChromeClient(this)
 
+        webView!!.webViewClient = object : WebViewClient() {
 
-        //
-
-        webView!!.settings.userAgentString = "ExamPay"
-        webView!!.getSettings().javaScriptEnabled = true
-        webView!!.getSettings().setGeolocationEnabled(true)
-        webView!!.getSettings().domStorageEnabled = true
-        webView!!.setWebChromeClient(MyWebChromeClient(this))
-//        webView!!.addJavascriptInterface(JavaScriptInterface(), "AndroidInterface")
-
-        webView!!.setWebViewClient(object : WebViewClient() {
-            override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-               // isLoadingStarted = true
-                if (isTimerFinished && dialog!!.isVisible) {
-                    dialog!!.dismiss()
-                    progress!!.setVisibility(View.VISIBLE)
+                progress!!.visibility= View.VISIBLE
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                    progress!!.visibility = View.GONE
+
+            }
+
+
+            override fun onPageCommitVisible(view: WebView?, url1: String?) {
+                super.onPageCommitVisible(view, url1)
+
+            }
+
+            override fun onReceivedError(
+                view: WebView?,
+                errorCode: Int,
+                description: String?,
+                failingUrl: String?
+            ) {
+                if (errorCode == -2) {
+
                 }
             }
 
-            override fun onPageFinished(view: WebView, url: String) {
-                super.onPageFinished(view, url)
-                progress!!.setVisibility(View.GONE)
 
-                dialog!!.dismiss()
+            override fun shouldOverrideUrlLoading(view: WebView, url123: String?): Boolean {
+                url123?.let {
+                    Log.d("@@@@",url123.toString())
+                    if (url123.startsWith("intent://m.youtube.com/")) {
+                        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url123))
+                        try {
+                            this@WebActivity.startActivity(webIntent)
+                        } catch (ex: ActivityNotFoundException) {
+                        }
+                        return true
+                    } else  if (url123.startsWith("https://api.whatsapp.com")) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url123))
+                        startActivity(intent)
+                        return true
+                    } else if (url123.startsWith("https://www.facebook.com")) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url123));
+                        startActivity(intent);
+                        return true;
+                    } else if (url123.startsWith("https://www.linkedin.com")) {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url123))
+                        startActivity(intent)
+                        return true
+                    } else if (url123.startsWith("truecallersdk:")) {
+                        try {
+
+                            val uri = Uri.parse(url123)
+                            val intent = Intent(Intent.ACTION_VIEW, uri)
+                            startActivity(intent)
+
+                            return true
+                        } catch (e: URISyntaxException) {
+                            e.printStackTrace()
+                        }
+                    } else if (url123.startsWith("tel:")) {
+                        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(url123)))
+                        return true
+                    } else if (url123.startsWith("http") || url123.startsWith("https")) {
+                        return false
+                    } else if (url123.startsWith("intent")) {
+                        try {
+                            val intent = Intent.parseUri(url123, Intent.URI_INTENT_SCHEME)
+                            val fallbackUrl = intent.getStringExtra("browser_fallback_url")
+                            if (fallbackUrl != null) {
+                                view.loadUrl(fallbackUrl);
+                                return true
+                            }
+                        } catch (e: URISyntaxException) {
+                            e.printStackTrace()
+                        }
+                    } else if (Uri.parse(url123).getScheme().equals("market")) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW);
+                            intent.setData(Uri.parse(url123));
+                            startActivity(intent);
+                            return true;
+                        } catch (e: Exception) {
+                            // Google Play app is not installed, you may want to open the app store link
+                            val uri: Uri = Uri.parse(url123)
+                            view.loadUrl("http://play.google.com/store/apps/" + uri.getHost() + "?" + uri.getQuery());
+                            return false;
+                        }
+
+                    }else{
+                        try {
+
+
+                            val uri = Uri.parse(url123)
+                            val intent = Intent(Intent.ACTION_VIEW, uri)
+                            try {
+                                startActivity(intent)
+                            }catch (e:Exception){
+                                e.printStackTrace()
+                            }
+
+                            return true
+
+
+                        } catch (e: URISyntaxException) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+                return super.shouldOverrideUrlLoading(view, url123)
             }
+        }
 
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                progress!!.setVisibility(View.VISIBLE)
-//                if (url.startsWith("https://accounts.google.com")) {
-//                    val signInIntent = Auth.GoogleSignInApi.getSignInIntent(googleApiClient)
-//                    startActivityForResult(signInIntent, RC_SIGN_IN)
-//                    return true
-//                }
-//                return super.shouldOverrideUrlLoading(view, url);
-                view.loadUrl(url)
-                return true
-            }
-        })
+            webView!!.loadUrl("https://exampay.in/")
 
-        setDelay()
-        webView!!.loadUrl("https://exampay.in/")
     }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-//        if (requestCode == RC_SIGN_IN) {
-//            val result = Auth.GoogleSignInApi.getSignInResultFromIntent(data!!)
-//            handleSignInResult(result)
-//        }
-    }
-
-//    class JavaScriptInterface {
-//        @JavascriptInterface
-//        fun onSignIn(email: String?, profilePictureUrl: String?) {
-//            // Perform actions with the sign-in information, such as passing it to the website
-//            // or interacting with other parts of your Android app
-//        }
-//    }
-//    private fun handleSignInResult(result: GoogleSignInResult?) {
-//        if (result!!.isSuccess) {
-//            val account = result.signInAccount
-//            val userEmail = account!!.email
-//            val userProfilePictureUrl = account.photoUrl.toString()
-//            val javascriptCode =
-//                "javascript:window.AndroidInterface.onSignIn('$userEmail', '$userProfilePictureUrl');"
-//            webView!!.loadUrl(javascriptCode)
-//        } else {
-//            // Sign-in failed
-//            val status: Status = result.status
-//            val statusCode: Int = status.getStatusCode()
-//            Log.e("Google Sign-In", "Sign-in failed with error code: $statusCode")
-//        }
-//    }
-
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK && webView!!.canGoBack()) {
@@ -147,11 +219,11 @@ class WebActivity : AppCompatActivity() {
 
     private fun setDelay() {
         Handler(Looper.getMainLooper()).postDelayed({
-            if (isLoadingStarted) {
+//            if (isLoadingStarted) {
                 dialog!!.dismiss()
-            }
+//            }
             isTimerFinished = true
-        }, 1500)
+        }, 2500)
     }
 
 
